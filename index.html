@@ -119,6 +119,10 @@ function nextPair(){const c=(prof(S).pos.length?ranked(pool()).map(r=>r.c):pool(
  if(best&&Math.random()<.5)best.reverse();return best}
 const pcard=(n,k)=>{const c=by[n];return`<div class=pc>${IMG?`<img referrerpolicy=no-referrer src="${img(c,"art_crop")}">`:thumb(c)}<br><b>${lk(c.n)}</b> <span class=m>${colstr(c)} · ${c.d} decks</span><br>${c.h}${c.p?`<div class=ot><b>${c.s}</b> · wins by ${c.w.join(" + ")}<br>${hx(c.p)}</div>`:""}<button class=pk data-pk=${k}>${k=="a"?"◀":""} Pick this ${k=="b"?"▶":""}</button></div>`};
 function drawPair(){$("pr").innerHTML=!pairOn?"":`<div class=pr><b>Round ${rd+1}</b> <button class=pk data-pk=both>Like both</button> <button class=pk data-pk=none>Dislike both</button> <button class=pk data-pk=skip>Skip</button> <button class=pk data-pk=stop>Stop</button><div class=pp>${pair?pcard(pair[0],"a")+pcard(pair[1],"b"):"<p>No more pairs under the current filters.</p>"}</div></div>`}
+let off=0,shuf=null,lastSig="",lastR=[];
+function page(k){if(k=="next"){off+=15;shuf=null}else if(k=="prev"){off=shuf?off:Math.max(0,off-15);shuf=null}
+ else{const pool=lastR.slice(0,150).map(r=>r.c.n).filter(n=>!(shuf||[]).includes(n));for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}shuf=pool.slice(0,15)}
+ draw();scrollTo(0,$("out").offsetTop-10)}
 function answer(k){if(k=="stop"){pairOn=false;draw();return}
  if(pair){const[a,b]=pair;pair=null;seen.add(a);seen.add(b);rd++;
   const set=(n,v)=>{K.forEach(x=>S[x]=S[x].filter(y=>y!=n));if(v)S[v].push(n)};
@@ -133,7 +137,9 @@ function draw(){drawPair();$("rated").innerHTML=chips();$("lamv").textContent=$(
  const q=$("q").value.trim().toLowerCase().split(/\s+/).filter(Boolean);
  const P=q.length?D.filter(c=>c.g&&q.every(w=>(c.n+" "+c.t.join(" ")+" "+c.h).toLowerCase().includes(w))):pool(),R=ranked(P);
  if(sw&&by[sw]){const x=ranked([by[sw]])[0];$("sw").innerHTML=`<div class=sw><b>Rate this one to teach the model:</b>${card(x,whyOf(x.c,loved))}</div>`}else $("sw").innerHTML="";
- $("out").innerHTML=R.slice(0,30).map(r=>card(r,whyOf(r.c,loved))).join("")+`<p class=m>${q.length?P.length+" commanders match your search (filters ignored)":P.length+" commanders pass the filters"}. Match % = share of the 200+ deck commanders you'd score lower for.${friend?" Ranked by the lower of your two scores.":""}</p>`}
+ lastR=R;const sig=q.join(" ")+"|"+P.length+"|"+R.slice(0,5).map(r=>r.c.n).join();if(sig!=lastSig){off=0;shuf=null;lastSig=sig} // new filters or ratings: back to the top
+ const show=shuf?R.filter(r=>shuf.includes(r.c.n)):R.slice(off,off+15);
+ $("out").innerHTML=`<div class=row><b>${shuf?"15 shuffled from your top 150":`Matches ${off+1}–${off+show.length} of ${R.length}`}</b> <button class=pg data-pg=prev ${off||shuf?"":"disabled"}>◀ Previous 15</button><button class=pg data-pg=next ${off+15<R.length?"":"disabled"}>Next 15 ▶</button><button class=pg data-pg=shuf>🔀 Shuffle</button></div>`+show.map(r=>card(r,whyOf(r.c,loved))).join("")+`<div class=row><button class=pg data-pg=prev ${off||shuf?"":"disabled"}>◀ Previous 15</button><button class=pg data-pg=next ${off+15<R.length?"":"disabled"}>Next 15 ▶</button><button class=pg data-pg=shuf>🔀 Shuffle</button></div><p class=m>${q.length?P.length+" commanders match your search (filters ignored)":P.length+" commanders pass the filters"}. Match % = share of the 200+ deck commanders you'd score lower for.${friend?" Ranked by the lower of your two scores.":""}</p>`}
 const pv=$("pv"),cn=e=>e.target.closest&&e.target.closest("a.cn");
 const byF={};D.forEach(c=>byF[front(c.n)]=c);
 document.addEventListener("mouseover",e=>{const a=cn(e);if(!a)return;const c=byF[a.dataset.n];
@@ -143,7 +149,7 @@ document.addEventListener("mouseover",e=>{const a=cn(e);if(!a)return;const c=byF
 document.addEventListener("mousemove",e=>{if(pv.style.display=="block"){pv.style.left=Math.min(e.clientX+16,innerWidth-266)+"px";pv.style.top=Math.max(8,Math.min(e.clientY-120,innerHeight-360))+"px"}});
 document.addEventListener("mouseout",e=>{if(cn(e))pv.style.display="none"});
 document.addEventListener("click",e=>{const t=e.target;
- if(t.classList.contains("pk"))answer(t.dataset.pk);
+ if(t.classList.contains("pk"))answer(t.dataset.pk);if(t.classList.contains("pg"))page(t.dataset.pg);
  if(t.classList.contains("rm"))rate(t.dataset.n,null);if(t.classList.contains("rt"))rate(t.dataset.n,t.dataset.k)});
 K.forEach(k=>$("b"+k).onclick=()=>{rate($("add").value,k);$("add").value=""});
 $("rs").onclick=()=>{S=JSON.parse(JSON.stringify(START));K.forEach(k=>S[k]=S[k]||[]);save();sw=null;draw()};
