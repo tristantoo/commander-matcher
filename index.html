@@ -12,7 +12,7 @@ input,select,button,textarea{font:inherit;color:inherit;background:var(--bg);bor
 .c{display:flex;gap:12px;border-top:1px solid var(--ln);padding:10px 0}.c img{width:150px;height:110px;object-fit:cover;border-radius:4px;background:var(--ln);flex:none}
 .c b{font-size:16px}.tag{display:inline-block;border:1px solid var(--ln);border-radius:3px;padding:0 5px;margin:1px 2px 1px 0;font-size:12px}.sh{background:rgba(42,138,42,.18)}
 .ot{font-size:12px;color:var(--mut);margin:4px 0 6px;padding-left:8px;border-left:2px solid var(--ln)}.c .ot b{font-weight:600;font-size:inherit}
-.sw{border:2px solid var(--ac);padding:8px;border-radius:6px;margin:8px 0}
+.sw,.pr{border:2px solid var(--ac);padding:8px;border-radius:6px;margin:8px 0}.pp{display:flex;gap:12px;flex-wrap:wrap}.pc{flex:1 1 280px;min-width:0}.pc img{width:100%;border-radius:4px;background:var(--ln)}.pc .th{--k:.5}
 .bd{display:inline-block;background:var(--ac);color:var(--bg);border-radius:10px;padding:0 8px;font-size:12px}a.cn{color:inherit;text-decoration:underline dotted}#pv{position:fixed;display:none;z-index:9;width:250px;height:350px;background-size:cover;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,.5);pointer-events:none}
 .th{--k:.5;width:150px;height:110px;flex:none;border-radius:4px;background-color:var(--ln);background-repeat:no-repeat;background-size:calc(3000px*var(--k)) calc(2190px*var(--k));background-position:calc(var(--x,0)*var(--k)*-1px) calc(var(--y,0)*var(--k)*-1px)}
 @media(max-width:600px){.c img{width:90px;height:66px}.th{--k:.3;width:90px;height:66px}}
@@ -21,6 +21,7 @@ input,select,button,textarea{font:inherit;color:inherit;background:var(--bg);bor
 <p class=m>Rate commanders love / like / dislike / hate (like and dislike count half as much) and the list re-ranks. Scores come from EDHREC tags, color identity, bracket mix, AI-written play-style ratings (guesses), and, for commanders with 200+ decks, features measured from EDHREC's average decklist (ramp, removal, draw counts and so on) plus a short play-style label written by an AI reading that list. The playstyle weight slider sets how much those last two count; on a 7-commander test they did not beat the older tags-only model.</p>
 <h2>Your ratings</h2>
 <div class=row><input id=add list=names placeholder="add a commander by name" size=36><button id=blove>♥ Love</button><button id=blike>+ Like</button><button id=bdislike>− Dislike</button><button id=bhate>✕ Hate</button><button id=rs>Reset to starting profile</button><button id=exm>Load an example profile</button></div>
+<div class=row><button id=ptoc>This or that rounds</button><span class=m>two commanders at a time; picking one counts as a like for it and a dislike for the other</span></div><div id=pr></div>
 <datalist id=names></datalist><div id=rated></div>
 <h2>Filters</h2>
 <div class=row>
@@ -111,7 +112,21 @@ function card(r,why){const c=r.c;return`<div class=c>${IMG?`<img loading=lazy re
 function whyOf(c,loved){const lk={};c.t.forEach(t=>{loved.forEach(l=>{if(l.t.includes(t))(lk[t]=lk[t]||[]).push(front(l.n).split(",")[0])})});
  const tg=c.t.map(t=>`<span class="tag ${lk[t]?"sh":""}" title="${(lk[t]||[]).join(", ")}">${t}</span>`).join("");
  const best=loved.map(l=>[sim(c,l),l]).sort((a,b)=>b[0]-a[0])[0];return`${tg}<span class=m> closest to ${front(best[1].n).split(",")[0]} (green tags are shared with something you love)</span>`}
-function draw(){$("rated").innerHTML=chips();$("lamv").textContent=$("lam").value;$("pwv").textContent=$("pw").value;$("mcv").textContent=Math.round($("mc").value*100)+"%";$("mnv").textContent=Math.round($("mn").value*100)+"%";document.querySelectorAll(".cl").forEach(x=>x.value=(S.cl&&S.cl[x.dataset.k])||0);
+// ---- this-or-that rounds: show the least similar two of the top 25 current matches, so the pick separates tastes ----
+let pairOn=false,pair=null,rd=0;const seen=new Set();
+function nextPair(){const c=(prof(S).pos.length?ranked(pool()).map(r=>r.c):pool().sort((a,b)=>b.d-a.d)).filter(c=>!seen.has(c.n)).slice(0,25);let best=null,bs=9;
+ for(let i=0;i<c.length;i++)for(let j=i+1;j<c.length;j++){const s=sim(c[i],c[j]);if(s<bs){bs=s;best=[c[i].n,c[j].n]}}
+ if(best&&Math.random()<.5)best.reverse();return best}
+const pcard=(n,k)=>{const c=by[n];return`<div class=pc>${IMG?`<img referrerpolicy=no-referrer src="${img(c,"art_crop")}">`:thumb(c)}<br><b>${lk(c.n)}</b> <span class=m>${colstr(c)} · ${c.d} decks</span><br>${c.h}${c.p?`<div class=ot><b>${c.s}</b> · wins by ${c.w.join(" + ")}<br>${hx(c.p)}</div>`:""}<button class=pk data-pk=${k}>${k=="a"?"◀":""} Pick this ${k=="b"?"▶":""}</button></div>`};
+function drawPair(){$("pr").innerHTML=!pairOn?"":`<div class=pr><b>Round ${rd+1}</b> <button class=pk data-pk=both>Like both</button> <button class=pk data-pk=none>Dislike both</button> <button class=pk data-pk=skip>Skip</button> <button class=pk data-pk=stop>Stop</button><div class=pp>${pair?pcard(pair[0],"a")+pcard(pair[1],"b"):"<p>No more pairs under the current filters.</p>"}</div></div>`}
+function answer(k){if(k=="stop"){pairOn=false;draw();return}
+ if(pair){const[a,b]=pair;pair=null;seen.add(a);seen.add(b);rd++;
+  const set=(n,v)=>{K.forEach(x=>S[x]=S[x].filter(y=>y!=n));if(v)S[v].push(n)};
+  if(k=="a"){set(a,"like");set(b,"dislike")}else if(k=="b"){set(b,"like");set(a,"dislike")}else if(k=="both"){set(a,"like");set(b,"like")}else if(k=="none"){set(a,"dislike");set(b,"dislike")}
+  save();sw=null}
+ pair=nextPair();draw()}
+$("ptoc").onclick=()=>{pairOn=!pairOn;if(pairOn&&!pair)pair=nextPair();draw()};
+function draw(){drawPair();$("rated").innerHTML=chips();$("lamv").textContent=$("lam").value;$("pwv").textContent=$("pw").value;$("mcv").textContent=Math.round($("mc").value*100)+"%";$("mnv").textContent=Math.round($("mn").value*100)+"%";document.querySelectorAll(".cl").forEach(x=>x.value=(S.cl&&S.cl[x.dataset.k])||0);
  const lp=prof(S).pos,loved=(lp.length?lp:friend?prof(friend).pos:[]).map(p=>p.c);
  if(!loved.length){const top=pool().sort((a,b)=>b.d-a.d).slice(0,20);$("sw").innerHTML="";
   $("out").innerHTML="<p><b>Start here.</b> Love or like a few commanders you enjoy (or load the example profile above) and the list below turns into your matches. These are the 20 most-played commanders to start from.</p>"+top.map(c=>card({c,pct:null},c.t.map(t=>`<span class=tag>${t}</span>`).join(""))).join("");return}
@@ -128,6 +143,7 @@ document.addEventListener("mouseover",e=>{const a=cn(e);if(!a)return;const c=byF
 document.addEventListener("mousemove",e=>{if(pv.style.display=="block"){pv.style.left=Math.min(e.clientX+16,innerWidth-266)+"px";pv.style.top=Math.max(8,Math.min(e.clientY-120,innerHeight-360))+"px"}});
 document.addEventListener("mouseout",e=>{if(cn(e))pv.style.display="none"});
 document.addEventListener("click",e=>{const t=e.target;
+ if(t.classList.contains("pk"))answer(t.dataset.pk);
  if(t.classList.contains("rm"))rate(t.dataset.n,null);if(t.classList.contains("rt"))rate(t.dataset.n,t.dataset.k)});
 K.forEach(k=>$("b"+k).onclick=()=>{rate($("add").value,k);$("add").value=""});
 $("rs").onclick=()=>{S=JSON.parse(JSON.stringify(START));K.forEach(k=>S[k]=S[k]||[]);save();sw=null;draw()};
