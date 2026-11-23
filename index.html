@@ -18,7 +18,7 @@ input,select,button,textarea{font:inherit;color:inherit;background:var(--bg);bor
 @media(max-width:600px){.c img{width:90px;height:66px}.th{--k:.3;width:90px;height:66px}}
 </style>
 <div id=pv></div><h1>Commander matcher</h1>
-<p class=m>Rate commanders love / like / dislike / hate (like and dislike count half as much) and the list re-ranks. Scores come from EDHREC tags, color identity, and a stat chart of 15 traits per commander. Fourteen are measured from EDHREC's average decklist and card list (ramp, interaction, speed, cost and so on) and shown as levels 1–5 relative to the other commanders; decision load and the play-style line are AI-written. On a held-out test (EDHREC's own "similar commanders" lists) the stats improved matching slightly over tags and colors alone.</p>
+<p class=m>Rate commanders love / like / dislike / hate (like and dislike count half as much) and the list re-ranks. Scores come from EDHREC tags, color identity, and a stat chart of 15 traits per commander. Fourteen are measured from EDHREC's average decklist and card list (ramp, interaction, speed, cost and so on) and shown as levels 1–5 relative to the other commanders; decision load and the play-style line are AI-written. On a held-out test (EDHREC's own "similar commanders" lists) the stats improved matching slightly over tags and colors alone. A second, smaller block of AI-judged traits (complexity, self-sufficiency, table impact and others) is also counted; it improved ranking on one person's ratings and slightly lowered agreement with EDHREC's lists, so it has its own weight slider.</p>
 <h2>Your ratings</h2>
 <div class=row><input id=add list=names placeholder="add a commander by name" size=36><button id=blove>♥ Love</button><button id=blike>+ Like</button><button id=bdislike>− Dislike</button><button id=bhate>✕ Hate</button><button id=rs>Reset to starting profile</button><button id=exm>Load an example profile</button></div>
 <div class=row><button id=ptoc>This or that rounds</button><span class=m>two commanders at a time; picking one counts as a like for it and a dislike for the other</span></div><div id=pr></div>
@@ -31,6 +31,7 @@ input,select,button,textarea{font:inherit;color:inherit;background:var(--bg);bor
 <label>max cEDH share <input id=mc type=range min=0 max=1 step=.05 value=1 title="hide commanders whose share of decks in bracket 5 is above this"> <span id=mcv class=m>100%</span></label>
 <label>popularity pull <input id=lam type=range min=-.5 max=1 step=.1 value=.5 title="0 = ignore popularity, negative = favor obscure"> <span id=lamv class=m>.5</span></label>
 <label>stat weight <input id=tw type=range min=0 max=1 step=.05 value=.35 title="how much the stat chart counts in the match (0 = tags and colors only)"> <span id=twv class=m>.35</span></label>
+<label>AI axes weight <input id=ow type=range min=0 max=1 step=.05 value=.2 title="how much seven AI-judged traits (speed, combo, interaction, complexity, self-sufficiency, table impact, power) and two EDHREC bracket shares count in the match (0 = off)"> <span id=owv class=m>.2</span></label>
 <label>style <select id=ps title="only commanders whose decks play this way (only commanders with 200+ decks are labeled)"><option value="">any<option>aggro<option>midrange<option>combo<option>control<option>ramp<option>stax<option>value</select></label>
 <label>wins by <select id=pn><option value="">any<option>combat<option>voltron<option>combo<option>drain<option>overwhelming-board<option>alt-win<option>burn<option>mill</select></label>
 </div>
@@ -59,13 +60,16 @@ const AX=[["Speed","fast = low average mana value"],["Ramp","mana rocks, dorks a
 const NT=AX.length,tv=c=>c.tr.map((x,i)=>i<14?x/100:x),TX=D.filter(c=>c.tr),TM=AX.map((_,j)=>mean(TX.map(c=>tv(c)[j]))),TS=AX.map((_,j)=>std(TX.map(c=>tv(c)[j])));
 const lvl=(c,i)=>i<14?1+Math.min(4,Math.floor(c.tr[i]/20)):c.tr[i];
 const chart=c=>c.tr?`<div class=st>${AX.map(([n,h],i)=>{const v=lvl(c,i),u=c.tu&&c.tu.includes(i);return`<span title="${n}: ${h}. ${i<14?`Level ${v} of 5 = percentile ${(v-1)*20}-${v*20} among the ${TX.length} commanders with 200+ decks`:`Level ${v} of 5`}${u?". Uncertain: two ways of measuring this disagree by 2+ levels":""}">${n}${u?"<b class=uq>?</b>":""} <i>${[1,2,3,4,5].map(k=>`<u class=${k<=v?"on":""}></u>`).join("")}</i></span>`}).join("")}</div>`:'<div class=ot>no stat chart: fewer than 200 decks</div>';
-let SW=.35; // weight of the stat block in the match (tags .65, colors .15)
-function build(){D.forEach(c=>{c._t={};c.t.forEach((t,i)=>c._t[t]=idf[t]*(1-.08*i));c._n=c.tr?tv(c).map((x,j)=>(x-TM[j])/TS[j]):AX.map(()=>0);c._c=new Set([...c.c].filter(x=>x!="C"));c._tn=Math.sqrt(Object.values(c._t).reduce((s,v)=>s+v*v,0))||1;c._nn=Math.sqrt(c._n.reduce((s,v)=>s+v*v,0));c._lp=Math.log(c.d)})}
+// old block (as in core.py): EDHREC friendly share, bracket-5 share, then 7 AI-judged traits; z-scored over all commanders, weighted 1,1,.4 x7
+const OF=[c=>fill(c)[0],c=>fill(c)[1],...[0,1,2,3,4,5,6].map(k=>c=>c.a[k])],OWT=[1,1,.4,.4,.4,.4,.4,.4,.4],OST=OF.map(f=>[mean(D.map(f)),std(D.map(f))]);
+let SW=.35,OW=.2; // weights of the stat block and the old block in the match (tags .65, colors .15)
+function build(){D.forEach(c=>{c._t={};c.t.forEach((t,i)=>c._t[t]=idf[t]*(1-.08*i));c._n=c.tr?tv(c).map((x,j)=>(x-TM[j])/TS[j]):AX.map(()=>0);c._c=new Set([...c.c].filter(x=>x!="C"));c._tn=Math.sqrt(Object.values(c._t).reduce((s,v)=>s+v*v,0))||1;c._nn=Math.sqrt(c._n.reduce((s,v)=>s+v*v,0));c._o=OF.map((f,j)=>(f(c)-OST[j][0])/OST[j][1]*OWT[j]);c._on=Math.sqrt(c._o.reduce((s,v)=>s+v*v,0));c._lp=Math.log(c.d)})}
 build();
 const sim=(a,b)=>{let d=0;for(const k in a._t)if(b._t[k])d+=a._t[k]*b._t[k];const tc=d/(a._tn*b._tn);
  let nd=0;for(let i=0;i<a._n.length;i++)nd+=a._n[i]*b._n[i];const nc=a._nn&&b._nn?nd/(a._nn*b._nn):0;
+ let od=0;for(let i=0;i<9;i++)od+=a._o[i]*b._o[i];const oc=a._on&&b._on?od/(a._on*b._on):0;
  const u=new Set([...a._c,...b._c]);let it=0;a._c.forEach(x=>{if(b._c.has(x))it++});const cj=u.size?it/u.size:1;
- return .65*tc+SW*(nc+1)/2+.15*cj};
+ return .65*tc+SW*(nc+1)/2+OW*(oc+1)/2+.15*cj};
 const zs=a=>{const m=mean(a),s=std(a);return a.map(x=>(x-m)/s)};
 // score = mean similarity to loved - .5*mean similarity to hated, z-scored against commanders with 200+ decks, plus lam*z(log decks)
 function combMap(pos,neg,lam,ref){ // pos/neg: [{c,w}]; love/hate weigh 1, like/dislike .5
@@ -134,7 +138,7 @@ function answer(k){if(k=="stop"){pairOn=false;draw();return}
 document.addEventListener("keydown",e=>{if(!pairOn||/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))return;
  const k={ArrowLeft:"a",ArrowRight:"b",ArrowUp:"both",ArrowDown:"none"," ":"skip",Escape:"stop"}[e.key];if(k){e.preventDefault();answer(k)}});
 $("ptoc").onclick=()=>{pairOn=!pairOn;if(pairOn&&!pair)pair=nextPair();draw()};
-function draw(){drawPair();$("rated").innerHTML=chips();$("lamv").textContent=$("lam").value;$("twv").textContent=$("tw").value;$("mcv").textContent=Math.round($("mc").value*100)+"%";$("mnv").textContent=Math.round($("mn").value*100)+"%";document.querySelectorAll(".cl").forEach(x=>x.value=(S.cl&&S.cl[x.dataset.k])||0);
+function draw(){drawPair();$("rated").innerHTML=chips();$("lamv").textContent=$("lam").value;$("twv").textContent=$("tw").value;$("owv").textContent=$("ow").value;$("mcv").textContent=Math.round($("mc").value*100)+"%";$("mnv").textContent=Math.round($("mn").value*100)+"%";document.querySelectorAll(".cl").forEach(x=>x.value=(S.cl&&S.cl[x.dataset.k])||0);
  const lp=prof(S).pos,loved=(lp.length?lp:friend?prof(friend).pos:[]).map(p=>p.c);
  if(!loved.length){const top=pool().sort((a,b)=>b.d-a.d).slice(0,20);$("sw").innerHTML="";
   $("out").innerHTML="<p><b>Start here.</b> Love or like a few commanders you enjoy (or load the example profile above) and the list below turns into your matches. These are the 20 most-played commanders to start from.</p>"+top.map(c=>card({c,pct:null},c.t.map(t=>`<span class=tag>${t}</span>`).join(""))).join("");return}
@@ -172,7 +176,7 @@ $("sur").onclick=()=>{const rated=K.flatMap(k=>S[k]).map(n=>by[n]).filter(Boolea
  const R=ranked(pool()).slice(0,60);
  let best=null,bs=9;R.forEach(r=>{const m=Math.max(...rated.map(x=>sim(r.c,x)));if(m<bs){bs=m;best=r.c.n}});sw=best;draw()};
 ["md","mf","lam","q","mc","mn"].forEach(id=>$(id).oninput=draw);["ps","pn"].forEach(id=>$(id).onchange=draw);
-$("tw").oninput=()=>{SW=+$("tw").value;draw()};
+$("tw").oninput=()=>{SW=+$("tw").value;draw()};$("ow").oninput=()=>{OW=+$("ow").value;draw()};
 $("mn").oninput=()=>{$("mf").value=+$("mn").value>0?0:.6;draw()}; // wanting cEDH commanders means the friendly floor must go
 document.querySelectorAll(".cb").forEach(x=>x.onchange=draw);
 draw();
