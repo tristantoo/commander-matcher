@@ -120,7 +120,7 @@ function nextPair(){const c=(prof(S).pos.length?ranked(pool()).map(r=>r.c):pool(
  for(let i=0;i<c.length;i++)for(let j=i+1;j<c.length;j++){const s=sim(c[i],c[j]);if(s<bs){bs=s;best=[c[i].n,c[j].n]}}
  if(best&&Math.random()<.5)best.reverse();return best}
 const pcard=(n,k)=>{const c=by[n];return`<div class=pc>${IMG?`<div class="im r"><img referrerpolicy=no-referrer src="${img(c,"art_crop")}">${c.bk?`<img referrerpolicy=no-referrer title="back face" src="${img(c,"art_crop","back")}">`:""}</div>`:thumb(c)}<br><b>${lk(c.n)}</b> <span class=m>${colstr(c)} · ${c.d} decks</span><br>${c.h}${chart(c)}${c.p?`<div class=ot><b>${c.s}</b> · wins by ${c.w.join(" + ")}<br>${hx(c.p)}</div>`:""}<button class=pk data-pk=${k}>${k=="a"?"◀":""} Pick this ${k=="b"?"▶":""}</button></div>`};
-function drawPair(){$("pr").innerHTML=!pairOn?"":`<div class=pr><b>Round ${rd+1}</b> <button class=pk data-pk=both>Like both</button> <button class=pk data-pk=none>Dislike both</button> <button class=pk data-pk=skip>Skip</button> <button class=pk data-pk=stop>Stop</button><div class=pp>${pair?pcard(pair[0],"a")+pcard(pair[1],"b"):"<p>No more pairs under the current filters.</p>"}</div></div>`}
+function drawPair(){$("pr").innerHTML=!pairOn?"":`<div class=pr><b>Round ${rd+1}</b> <button class=pk data-pk=both>Like both</button> <button class=pk data-pk=none>Dislike both</button> <button class=pk data-pk=skip>Skip</button> <button class=pk data-pk=stop>Stop</button> <span class=m>keys: ← left, → right, ↑ like both, ↓ dislike both, space skip, esc stop</span><div class=pp>${pair?pcard(pair[0],"a")+pcard(pair[1],"b"):"<p>No more pairs under the current filters.</p>"}</div></div>`}
 let off=0,shuf=null,lastSig="",lastR=[];
 function page(k){if(k=="next"){off+=15;shuf=null}else if(k=="prev"){off=shuf?off:Math.max(0,off-15);shuf=null}
  else{const pool=lastR.slice(0,150).map(r=>r.c.n).filter(n=>!(shuf||[]).includes(n));for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}shuf=pool.slice(0,15)}
@@ -128,9 +128,11 @@ function page(k){if(k=="next"){off+=15;shuf=null}else if(k=="prev"){off=shuf?off
 function answer(k){if(k=="stop"){pairOn=false;draw();return}
  if(pair){const[a,b]=pair;pair=null;seen.add(a);seen.add(b);rd++;
   const set=(n,v)=>{K.forEach(x=>S[x]=S[x].filter(y=>y!=n));if(v)S[v].push(n)};
-  if(k=="a"){set(a,"like");set(b,"dislike")}else if(k=="b"){set(b,"like");set(a,"dislike")}else if(k=="both"){set(a,"like");set(b,"like")}else if(k=="none"){set(a,"dislike");set(b,"dislike")}
+  if(k=="a"||k=="b"){const w=k=="a"?a:b,l=k=="a"?b:a;set(w,"like");set(l,"dislike");(S.pairs=S.pairs||[]).push([w,l])}else if(k=="both"){set(a,"like");set(b,"like")}else if(k=="none"){set(a,"dislike");set(b,"dislike")}
   save();sw=null}
  pair=nextPair();draw()}
+document.addEventListener("keydown",e=>{if(!pairOn||/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName))return;
+ const k={ArrowLeft:"a",ArrowRight:"b",ArrowUp:"both",ArrowDown:"none"," ":"skip",Escape:"stop"}[e.key];if(k){e.preventDefault();answer(k)}});
 $("ptoc").onclick=()=>{pairOn=!pairOn;if(pairOn&&!pair)pair=nextPair();draw()};
 function draw(){drawPair();$("rated").innerHTML=chips();$("lamv").textContent=$("lam").value;$("twv").textContent=$("tw").value;$("mcv").textContent=Math.round($("mc").value*100)+"%";$("mnv").textContent=Math.round($("mn").value*100)+"%";document.querySelectorAll(".cl").forEach(x=>x.value=(S.cl&&S.cl[x.dataset.k])||0);
  const lp=prof(S).pos,loved=(lp.length?lp:friend?prof(friend).pos:[]).map(p=>p.c);
@@ -160,7 +162,7 @@ $("rs").onclick=()=>{S=JSON.parse(JSON.stringify(START));K.forEach(k=>S[k]=S[k]|
 if(PUB)$("rs").textContent="Clear all ratings";
 $("ex").onclick=()=>{const s=JSON.stringify(S),p=$("px");p.value=s;p.hidden=false;p.select();try{navigator.clipboard.writeText(s).catch(()=>{})}catch(e){}}; // text box shown selected as the fallback when the clipboard is blocked
 $("exm").hidden=!PUB;$("exm").onclick=()=>{S=JSON.parse(JSON.stringify(EXAMPLE));K.forEach(k=>S[k]=S[k]||[]);save();sw=null;draw()};
-function readProfile(){try{const j=JSON.parse($("fr").value.trim());if(!j||!Array.isArray(j.love))throw 0;let bad=0;const p={cl:j.cl||{}};
+function readProfile(){try{const j=JSON.parse($("fr").value.trim());if(!j||!Array.isArray(j.love))throw 0;let bad=0;const p={cl:j.cl||{},pairs:(Array.isArray(j.pairs)?j.pairs:[]).filter(x=>Array.isArray(x)&&by[x[0]]&&by[x[1]])};
  K.forEach(k=>p[k]=(Array.isArray(j[k])?j[k]:[]).filter(n=>{const ok=typeof n=="string"&&by[n];if(!ok)bad++;return ok}));return[p,bad]}
  catch(e){$("fs").textContent="That isn't a profile. Paste the text from Copy my profile.";return null}}
 $("imp").onclick=()=>{const r=readProfile();if(!r)return;S=r[0];save();sw=null;$("fs").textContent=`Imported ${S.love.length} loved, ${S.like.length} liked, ${S.dislike.length} disliked, ${S.hate.length} hated`+(r[1]?` (${r[1]} unknown names skipped)`:"");draw()};
