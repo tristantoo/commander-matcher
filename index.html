@@ -12,7 +12,7 @@ input,select,button,textarea{font:inherit;color:inherit;background:var(--bg);bor
 .c{display:flex;gap:12px;border-top:1px solid var(--ln);padding:10px 0}.c img{width:150px;height:110px;object-fit:cover;border-radius:4px;background:var(--ln);flex:none}
 .c b{font-size:16px}.tag{display:inline-block;border:1px solid var(--ln);border-radius:3px;padding:0 5px;margin:1px 2px 1px 0;font-size:12px}.sh{background:rgba(42,138,42,.18)}
 .ot{font-size:12px;color:var(--mut);margin:4px 0 6px;padding-left:8px;border-left:2px solid var(--ln)}.c .ot b{font-weight:600;font-size:inherit}
-.sw,.pr{border:2px solid var(--ac);padding:8px;border-radius:6px;margin:8px 0}.pp{display:flex;gap:12px;flex-wrap:wrap}.pc{flex:1 1 280px;min-width:0}.pc img{width:100%;border-radius:4px;background:var(--ln)}.pc .th{--k:.5}.st{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 12px;margin:4px 0;font-size:12px}.st span{display:flex;justify-content:space-between;gap:6px}.st i{display:inline-flex;gap:2px;align-items:center}.st .uq{color:var(--mut);font-weight:400;margin-left:2px}.st u{width:10px;height:8px;border:1px solid var(--ln);display:inline-block}.st u.on{background:var(--ac);border-color:var(--ac)}.im{display:flex;flex-direction:column;gap:4px;flex:none}.im.r{flex-direction:row}.im.r img{flex:1;min-width:0}
+.sw,.pr{border:2px solid var(--ac);padding:8px;border-radius:6px;margin:8px 0}.pp{display:flex;gap:12px;flex-wrap:wrap}.pc{flex:1 1 280px;min-width:0}.pc img{width:100%;border-radius:4px;background:var(--ln)}.pc .th{--k:.5}.rt2{border-collapse:collapse;font-size:13px}.rt2 td,.rt2 th{padding:2px 10px 2px 0;text-align:left}.st{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:2px 12px;margin:4px 0;font-size:12px}.st span{display:flex;justify-content:space-between;gap:6px}.st i{display:inline-flex;gap:2px;align-items:center}.st .uq{color:var(--mut);font-weight:400;margin-left:2px}.st u{width:10px;height:8px;border:1px solid var(--ln);display:inline-block}.st u.on{background:var(--ac);border-color:var(--ac)}.im{display:flex;flex-direction:column;gap:4px;flex:none}.im.r{flex-direction:row}.im.r img{flex:1;min-width:0}
 .bd{display:inline-block;background:var(--ac);color:var(--bg);border-radius:10px;padding:0 8px;font-size:12px}a.cn{color:inherit;text-decoration:underline dotted}#pv{position:fixed;display:none;z-index:9;width:250px;height:350px;background-size:cover;border-radius:10px;box-shadow:0 4px 18px rgba(0,0,0,.5);pointer-events:none}
 .th{--k:.5;width:150px;height:110px;flex:none;border-radius:4px;background-color:var(--ln);background-repeat:no-repeat;background-size:calc(3000px*var(--k)) calc(2190px*var(--k));background-position:calc(var(--x,0)*var(--k)*-1px) calc(var(--y,0)*var(--k)*-1px)}
 @media(max-width:600px){.c img{width:90px;height:66px}.th{--k:.3;width:90px;height:66px}}
@@ -21,7 +21,7 @@ input,select,button,textarea{font:inherit;color:inherit;background:var(--bg);bor
 <p class=m>Rate commanders love / like / dislike / hate (like and dislike count half as much) and the list re-ranks. Scores come from EDHREC tags, color identity, and a stat chart of 15 traits per commander. Fourteen are measured from EDHREC's average decklist and card list (ramp, interaction, speed, cost and so on) and shown as levels 1–5 relative to the other commanders; decision load and the play-style line are AI-written. On a held-out test (EDHREC's own "similar commanders" lists) the stats improved matching slightly over tags and colors alone. A second, smaller block of AI-judged traits (complexity, self-sufficiency, table impact and others) is also counted; it improved ranking on one person's ratings and slightly lowered agreement with EDHREC's lists, so it has its own weight slider.</p>
 <h2>Your ratings</h2>
 <div class=row><input id=add list=names placeholder="add a commander by name" size=36><button id=blove>♥ Love</button><button id=blike>+ Like</button><button id=bdislike>− Dislike</button><button id=bhate>✕ Hate</button><button id=rs>Reset to starting profile</button><button id=exm>Load an example profile</button></div>
-<div class=row><button id=ptoc>This or that rounds</button><span class=m>two commanders at a time; picking one counts as a like for it and a dislike for the other</span></div><div id=pr></div>
+<div class=row><button id=ptoc>This or that rounds</button><span class=m>two commanders at a time; picking one counts as a like for it and a dislike for the other</span> <button id=rvb>Review my ratings</button></div><div id=pr></div><div id=rv></div>
 <datalist id=names></datalist><div id=rated></div>
 <h2>Filters</h2>
 <div class=row>
@@ -75,10 +75,11 @@ const sim=(a,b)=>{let d=0;for(const k in a._t)if(b._t[k])d+=a._t[k]*b._t[k];cons
  return .65*tc+SW*(nc+1)/2+OW*(oc+1)/2+.15*cj};
 const zs=a=>{const m=mean(a),s=std(a);return a.map(x=>(x-m)/s)};
 // score = mean similarity to loved - .5*mean similarity to hated, z-scored against commanders with 200+ decks, plus lam*z(log decks)
+let MS=null; // mean/sd of the last combMap, so review() can score a held-out commander on the same scale
 function combMap(pos,neg,lam,ref){ // pos/neg: [{c,w}]; love/hate weigh 1, like/dislike .5
  const sw=pos.reduce((s,p)=>s+p.w,0),raw=new Map();for(const c of D)if(c.g)raw.set(c,pos.reduce((s,p)=>s+p.w*sim(c,p.c),0)/sw-(neg.length?.5*neg.reduce((s,p)=>s+p.w*sim(c,p.c),0)/neg.length:0));
  const rr=ref.map(c=>raw.get(c)),lp=ref.map(c=>c._lp),m=mean(rr),s=std(rr),mp=mean(lp),sp=std(lp),out=new Map();
- raw.forEach((v,c)=>out.set(c,(v-m)/s+lam*(c._lp-mp)/sp+lean(c)));return out}
+ MS={m,s,mp,sp};raw.forEach((v,c)=>out.set(c,(v-m)/s+lam*(c._lp-mp)/sp+lean(c)));return out}
 const K=["love","like","dislike","hate"],SYM={love:"♥",like:"+",dislike:"−",hate:"✕"},WT={love:1,like:.5,dislike:.5,hate:1};
 const prof=s=>{const g=ks=>ks.flatMap(k=>(s[k]||[]).map(n=>({c:by[n],w:WT[k]}))).filter(x=>x.c);return{pos:g(["love","like"]),neg:g(["hate","dislike"])}};
 const ratedSet=()=>new Set(K.flatMap(k=>S[k]||[]));
@@ -182,6 +183,20 @@ $("sur").onclick=()=>{const rated=K.flatMap(k=>S[k]).map(n=>by[n]).filter(Boolea
 $("tw").oninput=()=>{SW=+$("tw").value;draw()};$("ow").oninput=()=>{OW=+$("ow").value;draw()};
 $("mn").oninput=()=>{$("mf").value=+$("mn").value>0?0:.6;draw()}; // wanting cEDH commanders means the friendly floor must go
 document.querySelectorAll(".cb").forEach(x=>x.onchange=draw);
+// ---- review of your own ratings: each loved/liked commander is scored with itself removed from your profile (so a commander is never judged by itself); same scale as the main list's Match % ----
+function review(){const me=prof(S),pos=me.pos,neg=me.neg;
+ if(pos.length<4){$("rv").innerHTML="<p class=m>Rate at least 4 commanders you like first.</p>";return}
+ const lam=+$("lam").value,ref=D.filter(c=>c.g&&c.d>=200&&!ratedSet().has(c.n)),zr=combMap(pos,neg,lam,ref),{m,s,mp,sp}=MS,rs=ref.map(c=>zr.get(c)).sort((a,b)=>a-b);
+ const pct=v=>{let lo=0,hi=rs.length;while(lo<hi){const mid=(lo+hi)>>1;rs[mid]<=v?lo=mid+1:hi=mid}return rs.length-lo+1},sw=pos.reduce((a,p)=>a+p.w,0);
+ const zof=(c,pp,nn,wp,wn)=>{const raw=pp.reduce((a,p)=>a+p.w*sim(c,p.c),0)/wp-(nn.length?.5*nn.reduce((a,p)=>a+p.w*sim(c,p.c),0)/wn:0);return(raw-m)/s+lam*(c._lp-mp)/sp+lean(c)};
+ const liked=pos.map(p=>{const o=pos.filter(x=>x!==p),z=zof(p.c,o,neg,sw-p.w,neg.length),near=o.map(x=>[sim(p.c,x.c),x.c]).sort((a,b)=>b[0]-a[0])[0][1];return{c:p.c,w:p.w,z,pc:pct(z),near}}).sort((a,b)=>b.z-a.z);
+ const dis=neg.map(p=>{const o=neg.filter(x=>x!==p),z=zof(p.c,pos,o,sw,Math.max(1,o.length));return{c:p.c,z,pc:pct(z)}}).filter(x=>x.pc<=.1*rs.length).sort((a,b)=>b.z-a.z).slice(0,10);
+ const M=rs.length,cut=Math.round(.15*M),odd=liked.filter(x=>x.pc>cut).length,nm=x=>front(x.n).split(",")[0];
+ $("rv").innerHTML=`<div class=pr><b>Your ratings, reviewed</b> <button id=rvx>Close</button><p class=m>Each loved or liked commander is scored against the rest of your ratings with itself taken out, with the same scoring as the list below, and shows where it would land among the unrated commanders. #1 = it looks most like the rest of what you like. ${odd?`${odd} of ${liked.length} would not make the top ${cut} (15%) of the ${M} unrated commanders: those differ from your other likes.`:"None of them differ much from your other likes."} This ranks by similarity to your own ratings, not by how good the deck is.</p>
+ <table class=rt2><tr><th>#<th>commander<th>you<th>would rank<th>closest to your other likes<th></tr>${liked.map((x,i)=>`<tr><td>${i+1}<td>${lk(x.c.n)}<td>${x.w==1?"♥ love":"+ like"}<td>#${x.pc}<td>${hx(nm(x.near))}<td>${x.pc>cut?"⚑ unlike the rest":""}</tr>`).join("")}</table>
+ ${dis.length?`<p><b>Disliked, but they fit your likes.</b> <span class=m>Scored against your likes with itself removed from your dislikes; these might deserve a second look.</span></p><table class=rt2><tr><th>commander<th>would rank</tr>${dis.map(x=>`<tr><td>${lk(x.c.n)}<td>#${x.pc} of ${M}</tr>`).join("")}</table>`:""}</div>`;
+ $("rvx").onclick=()=>{$("rv").innerHTML=""}}
+$("rvb").onclick=review;
 // ---- decklist match: IDF-weighted cosine between the pasted deck and each commander's EDHREC average list (basics ignored) ----
 D.forEach(c=>{if(c.dk){let s=0;c._k=c.dk.map(x=>s+=x)}});
 const KD=D.filter(c=>c._k),kdf=new Float64Array(CARDS.length);KD.forEach(c=>c._k.forEach(i=>kdf[i]++));
